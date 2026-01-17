@@ -21,7 +21,7 @@ All multi-GB data is stored in **Cloudflare R2 (S3-compatible object storage)** 
 
 The training code assumes the following structure exists locally:
 
-```text
+```
 ~/HFT_forecast/
 ├── model_data/
 │   └── <yyyy>/
@@ -63,12 +63,42 @@ The training code assumes the following structure exists locally:
 
 # Output model path
 
-```text
+```
 ~/HFT_forecast/fit_data/roll30/live/<startdate>_<enddate>/
 ```
-Each training run writes:
+# Each training run writes:
 - .pt : trained PyTorch model
 -	.json : model configuration / metadata
 -	Optional summary CSVs and metrics
 
-This structure allows multiple rolling windows to coexist cleanly.
+## This structure allows multiple rolling windows to coexist cleanly.
+
+# Training Logs
+
+# Log path
+
+```
+~/HFT_forecast/logs_hft/train/*.log
+```
+- One or more logs per training run
+- Includes data range, hyperparameters, and training diagnostics
+
+## Training Script
+
+# Primary training entry point
+
+```
+~/HFT_forecast/HFT_LSTM_train_POST30_ms_torch_multitask_b.py
+```
+
+# This script:
+- Reads SLIM Parquet files from model_data/<yyyy>/daily/
+- Trains POST30 multi-task LSTM models
+- Writes outputs to fit_data/roll30/live/<startdate>_<enddate>/
+- Emits logs to logs_hft/train/
+
+## Cloudflare R2 (Large Data Storage)
+
+# All large data files are stored in Cloudflare R2 (S3-compatible, no egress fees).
+
+# Bucket
