@@ -67,8 +67,8 @@ The training code assumes the following structure exists locally:
 ~/HFT_forecast/fit_data/roll30/live/<startdate>_<enddate>/
 ```
 Each training run writes:
-	-	.pt — trained PyTorch model
-	-	.json — model configuration / metadata
-	-	Optional summary CSVs and metrics
+- .pt : trained PyTorch model
+-	.json : model configuration / metadata
+-	Optional summary CSVs and metrics
 
 This structure allows multiple rolling windows to coexist cleanly.
