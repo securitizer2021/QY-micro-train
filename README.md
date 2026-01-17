@@ -97,7 +97,7 @@ This structure allows multiple rolling windows to coexist cleanly.
 
 # Cloudflare R2 (Large Data Storage)
 
-## Download Script
+## Parquet Data Download Script
 
 ```
 scripts/r2_download.py
