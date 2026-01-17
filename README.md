@@ -71,7 +71,7 @@ The training code assumes the following structure exists locally:
 -	.json : model configuration / metadata
 -	Optional summary CSVs and metrics
 
-## This structure allows multiple rolling windows to coexist cleanly.
+This structure allows multiple rolling windows to coexist cleanly.
 
 # Training Logs
 
@@ -99,6 +99,129 @@ The training code assumes the following structure exists locally:
 
 # Cloudflare R2 (Large Data Storage)
 
-# All large data files are stored in Cloudflare R2 (S3-compatible, no egress fees).
+## Download Script
 
-# Bucket
+```
+scripts/r2_download.py
+```
+
+All download logic lives in:
+The script:
+- Connects to Cloudflare R2 using the S3 API
+- Downloads multi-GB objects safely (multipart transfer)
+- Writes files into:
+
+```
+~/HFT_forecast/model_data/<yyyy>/daily/
+```
+
+# Running Model Training (After Data Download)
+
+Once the required data exists under:
+
+```
+~/HFT_forecast/model_data/<yyyy>/daily/
+```
+
+Training Command (Multi-Instrument, Multi-GPU)
+
+```bash
+PY=${PY:-python3}
+
+LOGDIR="/home/ubuntu/HFT_forecast/logs_hft/train"
+SAVE_ROOT="/home/ubuntu/HFT_forecast/fit_data/roll30/live"
+DATA_2025="/home/ubuntu/HFT_forecast/model_data/2025/daily"
+DATA_2026="/home/ubuntu/HFT_forecast/model_data/2026/daily"
+
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
+PROFILE="hft"
+
+INSTRUMENTS=(ES ZN)
+GPUS=(0 1)
+
+for idx in "${!INSTRUMENTS[@]}"; do
+  INSTRUMENT="${INSTRUMENTS[$idx]}"
+  GPU="${GPUS[$((idx % ${#GPUS[@]}))]}"
+
+  # Defaults (ES)
+  ROLLING_DAYS=30
+  EPOCHS=4
+  STEP_MS=3000
+  SAMPLE_SIZE=600000
+  BATCH_ANCHORS=288
+  LOGTAG="roll30"
+
+  # Overrides (ZN)
+  if [[ "$INSTRUMENT" == "ZN" ]]; then
+    ROLLING_DAYS=60
+    EPOCHS=5
+    STEP_MS=5000
+    SAMPLE_SIZE=900000
+    BATCH_ANCHORS=384
+    LOGTAG="roll60"
+  fi
+
+  export CUDA_VISIBLE_DEVICES="$GPU"
+
+  echo "[INFO] Launching ${INSTRUMENT}/${PROFILE} on GPU ${GPU}"
+
+  nohup "$PY" -u /home/ubuntu/HFT_forecast/HFT_LSTM_train_POST30_ms_torch_multitask_b.py \
+    --data_roots "$DATA_2025" "$DATA_2026" \
+    --event_type live \
+    --profile "$PROFILE" \
+    --instrument "$INSTRUMENT" \
+    --parent_symbol "$INSTRUMENT.FUT" \
+    --book_features auto \
+    --book_max_level 1 \
+    --save_dir "$SAVE_ROOT" \
+    --summary_csv "$SAVE_ROOT/summary_${LOGTAG}_live_${INSTRUMENT}_${PROFILE}_L1.csv" \
+    --rolling_days "$ROLLING_DAYS" \
+    --exclude_today \
+    --accept_daily_single \
+    --epochs "$EPOCHS" \
+    --batch_size 288 \
+    --win_a 0 \
+    --win_b 90000 \
+    --batch_anchors "$BATCH_ANCHORS" \
+    --sample_size "$SAMPLE_SIZE" \
+    --step_ms "$STEP_MS" \
+    --arch lstm \
+    --lstm_hidden 64 \
+    --lstm_layers 2 \
+    --lstm_dropout 0.2 \
+    --target logret \
+    --y_scale 1.0 \
+    --lam_reg 1.0 \
+    > "$LOGDIR/train_${LOGTAG}_live_${INSTRUMENT}_${PROFILE}_L1_gpu${GPU}_$(date -u +%Y%m%d_%H%M%S).log" 2>&1 &
+
+done
+
+```
+
+# Monitoring
+
+Check running jobs:
+
+```bash
+tail -f ~/HFT_forecast/logs_hft/train/*.log
+```
+
+# End-to-End Workflow Summary
+	1.	Download data from Cloudflare R2
+	2.	Verify data exists under model_data/<yyyy>/daily/
+	3.	Launch training command
+	4.	Monitor logs in logs_hft/train/
+	5.	Retrieve trained models from fit_data/roll30/live/<startdate>_<enddate>/
+
+# Summary
+- Input data
+  model_data/<yyyy>/daily/*.SLIM.parquet
+- Training script
+  HFT_LSTM_train_POST30_ms_torch_multitask_b.py
+- Model outputs
+  fit_data/roll30/live/<startdate>_<enddate>/
+- Logs
+  logs_hft/train/*.log
+- Large data storage
+  Cloudflare R2 (S3-compatible)
