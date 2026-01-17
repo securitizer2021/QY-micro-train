@@ -9,7 +9,7 @@ All multi-GB data is stored in **Cloudflare R2 (S3-compatible object storage)** 
 
 # Design Principles
 
-- **LSTM is the core model architecture used for training**
+- **LSTM** is the core model architecture used for training
 - Deterministic local file structure for training
 - Date-scoped model outputs for reproducibility
 
