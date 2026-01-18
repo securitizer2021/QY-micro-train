@@ -212,6 +212,9 @@ tail -f ~/HFT_forecast/logs_hft/train/*.log
 	4.	Monitor logs in logs_hft/train/
 	5.	Retrieve trained models from fit_data/roll30/live/<startdate>_<enddate>/
 
+# Required libraries
+Under requirements.txt (pip list)
+
 # Summary
 - Input data
   model_data/<yyyy>/daily/*.SLIM.parquet
